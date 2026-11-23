@@ -1,0 +1,4 @@
+// Flavor prod.
+PRODUCT_BUNDLE_IDENTIFIER = com.tripmate.app
+APP_DISPLAY_NAME = TripMate
+#include? "Signing.xcconfig"
