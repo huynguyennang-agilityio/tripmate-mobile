@@ -33,7 +33,11 @@ or a contradiction, stop and ask the product owner.
 ## Setup on a new machine
 
 1. Install Flutter **3.38.5** (Dart 3.10.4) exactly. `pubspec.yaml`
-   refuses any other Flutter version. With
+   pins both exactly (`environment: sdk: 3.10.4`, `flutter: 3.38.5`),
+   so `flutter pub get` fails with "version solving failed" on any
+   other Dart SDK or Flutter version, older or newer. Every `flutter`
+   command (analyze, test, run, build) runs that resolution first, so
+   a machine on another version cannot work silently. With
    [fvm](https://fvm.app): `fvm install 3.38.5 && fvm use 3.38.5`.
 2. Android: Android Studio with the Android SDK and its bundled JDK
    (17 or 21). Run `flutter doctor --android-licenses`.
@@ -134,8 +138,9 @@ required checks on `main`:
 | `Android build` | `flutter build apk --debug --flavor dev` and `--flavor prod` |
 
 The Flutter version is pinned in two places, `pubspec.yaml`
-(`environment: flutter:`) and the workflow's `FLUTTER_VERSION`. Change
-them together, in one pull request.
+(`environment: sdk:` and `flutter:`, both exact) and the workflow's
+`FLUTTER_VERSION`. Change all three values together, in one pull
+request.
 
 ## Coding conventions
 

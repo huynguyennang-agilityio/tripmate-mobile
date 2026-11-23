@@ -53,3 +53,10 @@ app.*.map.json
 *.mobileprovision
 key.properties
 local.properties
+*.p8
+*.pem
+*.key
+
+# Local tool settings of one machine.
+.fvm/
+.claude/settings.local.json
