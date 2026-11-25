@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// The app flavor: two apps that install side by side on one phone
 /// (EPIC-11 spec, section 2.11).
 ///
@@ -19,12 +21,17 @@ enum AppFlavor {
 
   /// The flavor for the native flavor [name] that Flutter reports.
   ///
-  /// No name means the app runs without a native flavor (for example in
-  /// `flutter test`), which is treated as [dev]. An unknown name is an
-  /// error, so a misnamed flavor never runs silently as another one.
-  static AppFlavor fromName(String? name) {
+  /// No name means the app runs without a native flavor. That is allowed
+  /// only when [allowMissing] is true, by default in debug mode (for
+  /// example in `flutter test`), and is treated as [dev]. In profile and
+  /// release builds a missing name is an error, as is an unknown name in
+  /// any mode, so a build never runs silently as another flavor.
+  static AppFlavor fromName(String? name, {bool allowMissing = kDebugMode}) {
     if (name == null || name.isEmpty) {
-      return AppFlavor.dev;
+      if (allowMissing) {
+        return AppFlavor.dev;
+      }
+      throw ArgumentError.value(name, 'name', 'No app flavor in this build');
     }
     for (final flavor in AppFlavor.values) {
       if (flavor.name == name) {

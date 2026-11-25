@@ -137,7 +137,11 @@ turns it on in widget tests (EPIC-11 spec, section 2.11).
 
 `.github/workflows/ci.yml` runs on every pull request to `main` and on
 every push to `main`, with Flutter 3.38.5. Its three jobs are the
-required checks on `main`:
+required checks on `main`. Each job first runs
+`flutter pub get --enforce-lockfile`, which fails when `pubspec.lock`
+is missing or does not satisfy `pubspec.yaml`, so CI tests exactly the
+committed dependency set; commit `pubspec.lock` with every
+`pubspec.yaml` change.
 
 | Job | Runs |
 |-----|------|

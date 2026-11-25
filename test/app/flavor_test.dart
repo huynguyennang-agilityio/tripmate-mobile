@@ -13,9 +13,21 @@ void main() {
       expect(AppFlavor.fromName('prod'), AppFlavor.prod);
     });
 
-    test('fromName treats no flavor as dev', () {
+    test('fromName treats no flavor as dev in debug mode', () {
       expect(AppFlavor.fromName(null), AppFlavor.dev);
       expect(AppFlavor.fromName(''), AppFlavor.dev);
+    });
+
+    test('fromName refuses no flavor outside debug mode', () {
+      expect(
+        () => AppFlavor.fromName(null, allowMissing: false),
+        throwsArgumentError,
+      );
+      expect(
+        () => AppFlavor.fromName('', allowMissing: false),
+        throwsArgumentError,
+      );
+      expect(AppFlavor.fromName('prod', allowMissing: false), AppFlavor.prod);
     });
 
     test('fromName refuses an unknown flavor', () {
