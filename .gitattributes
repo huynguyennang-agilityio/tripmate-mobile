@@ -1,0 +1,30 @@
+# Line endings are fixed here, not by each machine's Git settings, because
+# the work runs on macOS and on Windows (EPIC-11 spec, section 4.3).
+
+# Every text file is stored and checked out with LF.
+* text=auto eol=lf
+
+# Windows scripts need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: no line-ending conversion and no text diff.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.jar binary
+*.keystore binary
+*.jks binary
+*.so binary
+*.a binary
+*.zip binary
+*.gz binary

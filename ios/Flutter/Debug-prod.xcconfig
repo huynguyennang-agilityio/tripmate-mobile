@@ -1,0 +1,3 @@
+// Build configuration Debug-prod: Flutter's Debug settings plus the prod flavor.
+#include "Debug.xcconfig"
+#include "prod.xcconfig"

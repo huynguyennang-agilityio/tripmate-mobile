@@ -1,0 +1,3 @@
+// Build configuration Debug-dev: Flutter's Debug settings plus the dev flavor.
+#include "Debug.xcconfig"
+#include "dev.xcconfig"

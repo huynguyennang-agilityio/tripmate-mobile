@@ -1,0 +1,4 @@
+// Flavor dev: installs next to prod on one device.
+PRODUCT_BUNDLE_IDENTIFIER = com.tripmate.app.dev
+APP_DISPLAY_NAME = TripMate Dev
+#include? "Signing.xcconfig"

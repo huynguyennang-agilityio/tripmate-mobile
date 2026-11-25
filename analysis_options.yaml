@@ -1,0 +1,16 @@
+# Static analysis for tripmate-mobile. CI runs
+# `flutter analyze --fatal-infos --fatal-warnings`, so every lint below
+# fails the build (EPIC-11 spec, section 2.11).
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    - prefer_single_quotes
+    - always_declare_return_types
+    - directives_ordering
+    - unawaited_futures
