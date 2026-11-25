@@ -2,7 +2,8 @@
 
 The TripMate Mobile client: one Flutter app for Android and iOS. This
 file holds only what is about this repository's code: setup, commands,
-and coding conventions. Everything about the product lives in
+coding conventions, and how a card runs here with its agent roles.
+Everything about the product lives in
 `../tripmate-docs/` and is never copied here.
 
 ## Read first
@@ -20,8 +21,14 @@ The repositories are cloned side by side in one folder
 - Architecture: `../tripmate-docs/docs/architecture.md`.
 - API conventions and how the contract moves between repositories:
   `../tripmate-docs/docs/api-design.md`.
-- From card to merge (risk levels, the three agents, naming, Definition
-  of Done): `../tripmate-docs/docs/development-flow.md`.
+- From card to merge (task files, risk levels, the steps, the four
+  agents, the test check, the diff review, notes, naming, Definition
+  of Done): `../tripmate-docs/docs/development-flow.md`, sections 1
+  to 3.
+- The tasks of this repository: `tasks/<epic>.md`, for example
+  [`tasks/EPIC-11.md`](tasks/EPIC-11.md). Each task holds what its
+  Trello card says: facts, scope, Done when, test cases, and manual
+  checks.
 - How the app is tested: `../tripmate-docs/docs/test-strategy.md`.
 - The spec of the epic being built, under
   `../tripmate-docs/docs/specs/<epic>/spec.md`. The Mobile foundations
@@ -77,7 +84,8 @@ Every run and build names a flavor; there is no build without one.
 | Android builds (as CI) | `flutter build apk --debug --flavor dev` and `flutter build apk --debug --flavor prod` |
 | iOS simulator builds | `flutter build ios --debug --simulator --flavor dev` and `--flavor prod` |
 
-Before a pull request, run analyze, test, and both Android builds.
+Before a pull request, run analyze, test, and both Android builds, and
+get a clean test check (see "From card to merge").
 
 ### Flavors
 
@@ -185,10 +193,52 @@ importing its `data/` or `logic/`.
 
 ### Tests
 
-- A test of a card's case has the case ID at the start of its name,
-  e.g. `MF1-4 dev flavor: first screen shows "TripMate Dev"`.
+- A test of a task's case has the case ID at the start of its name,
+  and the requirement ID when the task has one, e.g. `MF1-4 dev
+  flavor: first screen shows "TripMate Dev"`. The case and its expected
+  result come from the task in `tasks/<epic>.md`.
 - A widget test passes the flavor to `TripMateApp` explicitly; no
   native flavor exists in `flutter test`.
+
+## From card to merge
+
+The flow is `../tripmate-docs/docs/development-flow.md`, sections 2.2
+to 2.6; this section says how it runs here.
+
+- **Tasks.** `tasks/<epic>.md` holds the tasks of this repository, for
+  example [`tasks/EPIC-11.md`](tasks/EPIC-11.md). It is changed only by
+  planning pull requests from Mac 1, approved by the product owner. No
+  card changes it; when a task is wrong or leaves something undecided,
+  stop and ask.
+- **One lead session** takes a card and starts the four agents of
+  `.claude/agents/`, each in a new session with no memory of the
+  others. Only files pass between them: the test files, the code, the
+  reports, and the comments on the pull request.
+
+| Step | Agent (`.claude/agents/`) | Produces |
+|------|---------------------------|----------|
+| 5. Write the tests | `test-agent` | One test per automated case of the task, shown failing; a test commit with the trailer `Agent: test`; the case-to-test table |
+| 6. Write the code | `code-agent` | Code until every test passes; the results of analyze, test, and both Android builds; a note of each decision |
+| 7. Check the tests | `test-check-agent`, on this machine | The test-check report: Cases, Lock, Code against tests, Matrix, Results. A test problem goes to a new test agent session, a code problem to the code agent. The pull request opens only when it is clean. |
+| 8. Open the pull request | `code-agent` | The pull request with the description below; CI runs |
+| 9. Review, round 1 | `diff-review-agent` | Findings at their file and line on the pull request, and a summary comment with the impact and the risk level |
+| 10. Fix | `code-agent` | A fix or a reply with the reason for each finding; the fixes pushed |
+| 11. Review, round 2 | A new `diff-review-agent`, on the diff since round 1 and the replies | Findings; nothing is fixed. A defect (development-flow.md, section 2.3) asks the product owner to review. Every other finding is a row for the notes file. |
+| 12. Merge | GitHub | When every required check passes; for a High card, or when round 2 found a defect, after the product owner's approval |
+
+- **Notes file.** The notes of round 2 go in
+  `tasks/EPIC-11-notes/<card>.md` (in general
+  `tasks/<epic>-notes/<card>.md`), one file per card, with the columns
+  Note, Level, Proposed fix, Priority, Decision (development-flow.md,
+  section 2.4). The diff-review agent changes nothing, so it posts the
+  rows on the pull request; the lead session or the code agent commits
+  the file in the card's pull request. Decision stays empty until the
+  epic closes.
+- **Reviews on GitHub.** The product owner and Claude Code share one
+  GitHub account, which cannot approve or request changes on its own
+  pull request. The diff-review agent therefore posts plain review
+  comments and a summary comment; the example commands are in
+  `.claude/agents/diff-review-agent.md`.
 
 ## Branches, commits, and pull requests
 
@@ -197,10 +247,17 @@ From `../tripmate-docs/docs/development-flow.md`, section 2.5.
 | What | Rule | Example |
 |------|------|---------|
 | Branch | `<type>/<ID>-<short-name>`; type is `feat`, `fix`, `refactor`, `test`, or `chore` | `feat/INV-01-create-invitation` |
-| Commit message | Starts with the requirement or card ID, in English | `INV-01 Expire an Invitation after 7 days` |
-| Pull request title | Starts with the requirement or card ID | `INV-01 Create an Invitation` |
-| Pull request description | The card link, the risk level, what changed and what is left out, the case-to-test table with its failing and passing runs, decisions, and the review report | -- |
+| Commit message | Starts with the requirement ID, in English | `INV-01 Expire an Invitation after 7 days` |
+| Pull request title | Starts with the requirement ID | `INV-01 Create an Invitation` |
+| Pull request description | The card and task links, the risk level, what changed and what is left out, the case-to-test table with its failing and passing runs, decisions, and the test-check report | -- |
 
+- A platform card with no requirement ID uses its card ID instead, for
+  example `MF1 Add CI: Analyze, Test, and Android build`. This is the
+  practice of this repository; development-flow.md does not write it
+  yet.
+- The task link points to the task in this repository, for example
+  `tasks/EPIC-11.md#mf1`. The description also lists the task's manual
+  checks with their results.
 - `main` is protected: every change goes through a pull request, and
   the branch must be up to date with `main`.
 - One card has one pull request per repository.
@@ -211,14 +268,15 @@ From `../tripmate-docs/docs/development-flow.md`, section 2.5.
 
 ## Agent roles
 
-Each card runs with three agents, defined in `.claude/agents/`
+The four roles are in `.claude/agents/`
 (`../tripmate-docs/docs/development-flow.md`, section 2.3):
 
-- `test-agent`: writes one test per case of the card, shown failing.
-- `code-agent`: writes the code until the tests pass; never changes a
-  test of the test agent.
-- `review-agent`: reads the diff and writes the review report; changes
-  nothing.
+| Role | Starts with | May change | Never |
+|------|-------------|------------|-------|
+| `test-agent` | The task, its spec sections, the pinned contract | Test files | Reads the code written for the card; makes up an expected result the task does not give |
+| `code-agent` | The task, its spec sections, the test files, and later the review findings | Code, and tests of its own | Changes, skips, or deletes a test of the test agent; changes `tasks/<epic>.md`; reads another agent's conversation |
+| `test-check-agent` | The task, the test files, the code, the test results | Nothing | Changes code or tests; reads another agent's conversation |
+| `diff-review-agent` | The pull request's diff, the task, its spec sections | Nothing; it only posts on the pull request | Changes code or tests; reads another agent's conversation |
 
 This file, the agent roles, and the CI workflow are High-risk files: a
 pull request that changes them needs the product owner's approval
