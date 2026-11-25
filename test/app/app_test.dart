@@ -1,5 +1,6 @@
 // Test cases for card MF1 "Mobile skeleton and CI".
-// Spec: tripmate-docs/docs/specs/epic-11/spec.md, sections 2.11 and 7.4.
+// Test cases: tasks/EPIC-11.md, task MF1.
+// Conventions: tripmate-docs/docs/specs/epic-11/spec.md, section 2.11.
 //
 // MF1-4 (level U): the app started with the `dev` flavor shows
 // "TripMate Dev" on its first screen; started with `prod`, it shows
