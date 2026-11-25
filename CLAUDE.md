@@ -218,6 +218,10 @@ to 2.6; this section says how it runs here.
   `.claude/agents/`, each in a new session with no memory of the
   others. Only files pass between them: the test files, the code, the
   reports, and the comments on the pull request.
+- Each agent's model is set in its role file: `code-agent` runs on
+  Sonnet; `test-agent`, `test-check-agent`, and `diff-review-agent` run
+  on Opus (development-flow.md, section 2.3). Do not override it when
+  starting an agent.
 
 | Step | Agent (`.claude/agents/`) | Produces |
 |------|---------------------------|----------|

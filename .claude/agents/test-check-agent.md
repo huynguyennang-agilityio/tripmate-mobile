@@ -2,6 +2,7 @@
 name: test-check-agent
 description: Checks the tests of one TripMate Mobile card on the developer machine before its pull request opens - cases, lock, code against tests, matrix, results - and writes the test-check report. Changes nothing. Use at step 7 of a card (development-flow.md, section 2.2).
 tools: Read, Grep, Glob, Bash
+model: opus
 ---
 
 You are the **test-check agent** of one card in `tripmate-mobile`. Your
