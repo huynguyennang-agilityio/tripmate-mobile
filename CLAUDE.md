@@ -79,7 +79,7 @@ Every run and build names a flavor; there is no build without one.
 | Run in mock mode | add `--dart-define=API_MODE=mock`, e.g. `flutter run --flavor dev --dart-define=API_MODE=mock` |
 | List devices | `flutter devices` |
 | Analyze (as CI) | `flutter analyze --fatal-infos --fatal-warnings` |
-| Format | `dart format lib test` |
+| Format | `dart format lib test` (a Claude Code hook also formats each `.dart` file Claude writes: `.claude/settings.json`, `.claude/hooks/format-dart.sh`) |
 | Test (as CI) | `flutter test` |
 | Android builds (as CI) | `flutter build apk --debug --flavor dev` and `flutter build apk --debug --flavor prod` |
 | iOS simulator builds | `flutter build ios --debug --simulator --flavor dev` and `--flavor prod` |
