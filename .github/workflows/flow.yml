@@ -1,0 +1,52 @@
+# Three of the four flow checks on every pull request to `main` (EPIC-11 spec, section 2.12):
+# `flow / failing-first`, `flow / test-lock`, and `flow / mutation` (skipped here, so green). They
+# run the pull request's own tests, so they run on `pull_request`. The fourth, the risk gate, is
+# `gate / risk-gate` from `risk-gate.yml` (`pull_request_target`), which a pull request cannot
+# change. Require on `main`: `flow / failing-first`, `flow / test-lock`, `gate / risk-gate`.
+# The checks' code is the backend's `flowchecks` package, pinned to a full commit SHA of
+# tripmate-backend, the same pin as tripmate-contracts. Moving the pin is a normal pull request;
+# it is High (`.github/**`).
+# `edited` runs the checks again when the description changes.
+name: Flow
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  flow:
+    uses: huynguyennang-agilityio/tripmate-backend/.github/workflows/flow-checks.yml@4b88e8cb5858084c43048c8c2e2d4ebe18447db9
+    with:
+      rules-file: .github/risk-paths.toml
+      # failing-first runs `test-command <path>` once per test file the test commit adds and wants a
+      # non-zero exit. `flutter test` exits non-zero for a failing test and for a file with no test;
+      # `no-test-pattern` turns the second into an error of the run. Flutter prints
+      # "No tests were found." for a file with no test (checked with an empty `main`) in every
+      # reporter, the one of GitHub Actions included.
+      test-command: flutter test
+      # failing-first runs this in the worktree of each test commit. It installs Flutter 3.38.5
+      # (pinned with pubspec.yaml and ci.yml; change all three together) outside the worktree, puts it on PATH for the
+      # commands that follow, and resolves the dependencies. The MF2 contract-check tests need Java
+      # and the OpenAPI Generator; the runner's own Temurin JDK serves them.
+      setup-command: |
+        git clone --quiet --depth 1 --branch 3.38.5 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+        echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+        export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
+        flutter pub get --enforce-lockfile
+      # Dart runs on Flutter's own SDK, so no Node.
+      node-version: ""
+      test-file-pattern: test/**/*_test.dart
+      no-test-pattern: 'No tests were found\.'
+      run-mutation: false
+      databases: false
+      run-risk-gate: false
+      flowchecks-repository: huynguyennang-agilityio/tripmate-backend
+      flowchecks-ref: 4b88e8cb5858084c43048c8c2e2d4ebe18447db9

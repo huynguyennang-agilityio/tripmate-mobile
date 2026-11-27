@@ -1,0 +1,10 @@
+{
+  "request.invalid": "Một số thông tin bạn gửi không hợp lệ.",
+  "request.idempotency_key_required": "Yêu cầu này cần header Idempotency-Key.",
+  "request.idempotency_in_progress": "Yêu cầu giống hệt vẫn đang được xử lý. Hãy thử lại sau giây lát.",
+  "request.idempotency_mismatch": "Idempotency-Key này đã được dùng cho một yêu cầu khác.",
+  "request.field_missing": "Trường này là bắt buộc.",
+  "request.field_invalid": "Giá trị này không hợp lệ.",
+  "request.not_found": "Địa chỉ này không tồn tại.",
+  "request.method_not_allowed": "Không thể thực hiện thao tác này ở đây."
+}

@@ -1,0 +1,17 @@
+{
+  "authNotSignedIn": "Hãy đăng nhập để tiếp tục.",
+  "authTokenExpired": "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.",
+  "commonAppName": "TripMate",
+  "rateLimited": "Bạn gửi quá nhiều yêu cầu. Hãy chờ một chút rồi thử lại.",
+  "requestInvalid": "Một số thông tin bạn gửi không hợp lệ.",
+  "requestIdempotencyKeyRequired": "Yêu cầu này cần header Idempotency-Key.",
+  "requestIdempotencyInProgress": "Yêu cầu giống hệt vẫn đang được xử lý. Hãy thử lại sau giây lát.",
+  "requestIdempotencyMismatch": "Idempotency-Key này đã được dùng cho một yêu cầu khác.",
+  "requestFieldMissing": "Trường này là bắt buộc.",
+  "requestFieldInvalid": "Giá trị này không hợp lệ.",
+  "requestNotFound": "Địa chỉ này không tồn tại.",
+  "requestMethodNotAllowed": "Không thể thực hiện thao tác này ở đây.",
+  "serverError": "Đã có lỗi ở phía chúng tôi. Hãy thử lại sau.",
+  "serverUnavailable": "TripMate tạm thời không hoạt động. Hãy thử lại sau giây lát.",
+  "serverNotImplemented": "Tính năng này chưa có. Nó sẽ có trong một phiên bản sau."
+}

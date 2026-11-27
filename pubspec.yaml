@@ -17,14 +17,27 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  dio: ^5.9.0
   flutter_bloc: ^9.1.1
+  flutter_localizations:
+    sdk: flutter
   go_router: ^17.5.0
+  intl: ^0.20.2
+  shared_preferences: ^2.5.3
+  tripmate_api:
+    path: packages/tripmate_api
+  uuid: ^4.5.1
 
 dev_dependencies:
   bloc_test: ^10.0.0
+  crypto: ^3.0.6
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
 
 flutter:
+  generate: true
   uses-material-design: true
+  assets:
+    # The contract's examples answer requests in mock mode (lib/core/api/mock_api.dart).
+    - contracts/openapi.json

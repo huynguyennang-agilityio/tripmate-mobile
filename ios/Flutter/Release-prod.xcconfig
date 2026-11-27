@@ -1,3 +1,4 @@
 // Build configuration Release-prod: Flutter's Release settings plus the prod flavor.
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release-prod.xcconfig"
 #include "Release.xcconfig"
 #include "prod.xcconfig"

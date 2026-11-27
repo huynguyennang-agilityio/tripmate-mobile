@@ -48,9 +48,14 @@ or a contradiction, stop and ask the product owner.
    [fvm](https://fvm.app): `fvm install 3.38.5 && fvm use 3.38.5`.
 2. Android: Android Studio with the Android SDK and its bundled JDK
    (17 or 21). Run `flutter doctor --android-licenses`.
-3. iOS (macOS only): Xcode with an iOS simulator. CocoaPods is needed
-   only once a plugin with native code is added (see "iOS flavors").
-4. Clone the repositories side by side (above), then:
+3. Java 17 or later for `tool/contracts.dart` and its tests (OpenAPI
+   Generator). Set `JAVA_HOME`, or put `java` on `PATH`. On macOS the JDK
+   of Android Studio works:
+   `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`.
+   `git` and access to pub.dev are needed too.
+4. iOS (macOS only): Xcode with an iOS simulator and CocoaPods
+   (`shared_preferences` has native iOS code; see "iOS flavors").
+5. Clone the repositories side by side (above), then:
 
    ```sh
    cd tripmate-mobile
@@ -58,7 +63,7 @@ or a contradiction, stop and ask the product owner.
    flutter doctor
    ```
 
-5. To run on a physical iPhone, create `ios/Flutter/Signing.xcconfig`
+6. To run on a physical iPhone, create `ios/Flutter/Signing.xcconfig`
    with one line, `DEVELOPMENT_TEAM = <your team ID>`. The file is
    ignored by Git, so no team ID is committed. The simulator needs no
    signing.
@@ -80,11 +85,13 @@ Every run and build names a flavor; there is no build without one.
 | List devices | `flutter devices` |
 | Analyze (as CI) | `flutter analyze --fatal-infos --fatal-warnings` |
 | Format | `dart format lib test` (a Claude Code hook also formats each `.dart` file Claude writes: `.claude/settings.json`, `.claude/hooks/format-dart.sh`) |
-| Test (as CI) | `flutter test` |
+| Test (as CI) | `flutter test` (the contract-check tests need Java) |
+| Generate the client, ARB files, and localizations | `dart run tool/contracts.dart generate` |
+| Check them against the pinned contract (as CI) | `dart run tool/contracts.dart check` |
 | Android builds (as CI) | `flutter build apk --debug --flavor dev` and `flutter build apk --debug --flavor prod` |
 | iOS simulator builds | `flutter build ios --debug --simulator --flavor dev` and `--flavor prod` |
 
-Before a pull request, run analyze, test, and both Android builds, and
+Before a pull request, run analyze, test, the contracts check, and both Android builds, and
 get a clean test check (see "From card to merge").
 
 ### Flavors
@@ -111,8 +118,9 @@ Both apps install side by side on one phone.
 
 ### iOS flavors and CocoaPods
 
-There is no `Podfile` yet, because no dependency has native iOS code.
-When Flutter first generates one, map every configuration in it:
+`ios/Podfile` exists since `shared_preferences` (native iOS code). Flutter
+generates a `Podfile` that knows only `Debug`, `Profile`, and `Release`,
+so every configuration is mapped in it:
 
 ```ruby
 project 'Runner', {
@@ -122,22 +130,89 @@ project 'Runner', {
 }
 ```
 
-and add the matching `#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.<config>.xcconfig"`
-line to each `ios/Flutter/<Config>.xcconfig`.
+and each `ios/Flutter/<Config>.xcconfig` starts with the matching
+`#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.<config>.xcconfig"`
+line (`<config>` is lowercase, e.g. `debug-dev`). Flutter itself adds the
+`debug` and `release` lines to its own `Debug.xcconfig` and
+`Release.xcconfig` on every run; keep them committed so the tree stays
+clean. When a new
+plugin changes the `Podfile`, check that the mapping is still there.
 
 ### Mock mode
 
 `--dart-define=API_MODE=mock` builds the app in mock mode; any other
 value, or none, is the real API. `ApiMode.current`
-(`lib/app/api_mode.dart`) holds the mode. The Dio interceptor that
-answers from the contract's examples comes with card MF2, which also
-turns it on in widget tests (EPIC-11 spec, section 2.11).
+(`lib/app/api_mode.dart`) holds the mode. In mock mode `createDio`
+(`lib/core/api/api_client.dart`) adds `MockApiInterceptor`
+(`lib/core/api/mock_api.dart`) last: it answers from the examples of
+`contracts/openapi.json` (a Flutter asset) and rejects an operation with
+no example with a `MissingExampleError` naming its `operationId`; it
+never makes data up. Widget tests turn it on with
+`TripMateApp(apiMode: ApiMode.mock)` after
+`SharedPreferences.setMockInitialValues({})`.
+
+Every request carries `X-Device-Id` (`lib/core/api/device_id.dart`, kept in
+`shared_preferences`), and every `POST` an `Idempotency-Key`
+(`lib/core/api/idempotency.dart`); a retry sends the same
+`RequestOptions` again (`dio.fetch(error.requestOptions)`), so it keeps
+the key. A retry that calls the generated method again (a "Try again"
+tap, a Cubit retrying after a timeout) builds new options, so it would get
+a new key. The interceptor keeps a key that is already set, so a create
+that can be retried this way makes one UUID per user action and passes it
+as `Options(headers: {IdempotencyKeyInterceptor.header: key})`. The first
+card with a create screen adds a helper for it.
+
+The base URL: `dev` is `http://10.0.2.2:8000` on Android and
+`http://localhost:8000` elsewhere; `prod` has no default yet (the
+production address is not decided) and needs
+`--dart-define=API_BASE_URL=<address>`, which also overrides `dev`. In
+the `prod` flavor the address must start with `https://`. `main()` calls
+`checkApiConfig`, so a real-mode `prod` build without it (or with a
+non-https one) stops at startup with a clear message instead of at the
+first request.
+
+The test screen `/health` (`lib/features/health/`) shows the `status` and
+`version` of `GET /v1/health` in both modes.
+
+### API client and translations (generated)
+
+`CONTRACTS_VERSION` holds the pinned `tripmate-contracts` tag. Everything
+that comes from it is generated by `dart run tool/contracts.dart generate`
+and never edited by hand:
+
+| Generated | From |
+|-----------|------|
+| `contracts/` (`openapi.json`, `translations/`) | A byte copy of the tag |
+| `packages/tripmate_api/` | The `dart-dio` client (OpenAPI Generator 7.17.0, jar checked by SHA-256, cached outside the repository; `json_serializable`, with its `build_runner` output committed) |
+| `lib/l10n/app_<lang>.arb`, `lib/l10n/app_localizations*.dart`, `l10n.yaml` | `translations/<lang>/*.json`; key `auth.not_signed_in` becomes `authNotSignedIn`; `flutter gen-l10n` |
+
+`CONTRACTS_SHA` holds the commit the tag must resolve to; the tool
+fetches the tag and fails when it points elsewhere. The build tools of the
+generated client are pinned by exact versions in the tool and by the
+committed `tool/generator.pubspec.lock` (used with `--enforce-lockfile`);
+`generate --update-lock` rewrites that lock when the generator or the tool's
+pinned versions change.
+
+To move to a new tag: change `CONTRACTS_VERSION` and `CONTRACTS_SHA`
+(`git rev-parse <tag>^{commit}` in `tripmate-contracts`), run `generate`, extract
+the tag's files into `test/fixtures/<tag>/` (the tests read them), commit
+all of it. `check` regenerates into a temporary folder and prints each
+file that differs, is missing, or is extra. Use `--source <dir>` for a
+local copy of `tripmate-contracts` and `--root <dir>` for another
+repository. Use `AppLocalizations` for every user-facing text; keys with
+placeholders need ARB metadata the tool does not write yet.
 
 ### CI
 
 `.github/workflows/ci.yml` runs on every pull request to `main` and on
-every push to `main`, with Flutter 3.38.5. Its three jobs are the
-required checks on `main`. Each job first runs
+every push to `main`, with Flutter 3.38.5. Its four jobs are the checks
+that `main` requires, but the branch protection of `main` lists only
+`Analyze`, `Test`, and `Android build` until the product owner adds the
+rest right after the MF2 pull request is merged: `Contracts`,
+`flow / failing-first`, `flow / test-lock`, and `gate / risk-gate`
+(`gate / risk-gate` only once `risk-gate.yml` is on `main`, because a
+`pull_request_target` workflow runs from the base; never the skipped
+`flow / risk-gate`). Until then MF2 is not done. Each job first runs
 `flutter pub get --enforce-lockfile`, which fails when `pubspec.lock`
 is missing or does not satisfy `pubspec.yaml`, so CI tests exactly the
 committed dependency set; commit `pubspec.lock` with every
@@ -146,13 +221,26 @@ committed dependency set; commit `pubspec.lock` with every
 | Job | Runs |
 |-----|------|
 | `Analyze` | `flutter analyze --fatal-infos --fatal-warnings` |
-| `Test` | `flutter test` |
+| `Test` | `flutter test` (with Java 17) |
+| `Contracts` | `dart run tool/contracts.dart check` (with Java 17) |
 | `Android build` | `flutter build apk --debug --flavor dev` and `--flavor prod` |
 
-The Flutter version is pinned in two places, `pubspec.yaml`
-(`environment: sdk:` and `flutter:`, both exact) and the workflow's
-`FLUTTER_VERSION`. Change all three values together, in one pull
-request.
+**Flow checks** (EPIC-11 spec, section 2.12): `.github/workflows/flow.yml`
+(`flow / failing-first`, `flow / test-lock`, and `flow / mutation`, which
+is skipped here) and `.github/workflows/risk-gate.yml` (`gate / risk-gate`,
+on `pull_request_target`, so a pull request cannot change it) call the
+reusable workflows of `tripmate-backend`, pinned to the same commit as
+`tripmate-contracts`. `flow / failing-first`, `flow / test-lock`, and
+`gate / risk-gate` are to be required on `main` too (see above). The risk levels of paths
+are in `.github/risk-paths.toml`; a path no rule names is High. Failing
+first runs `flutter test <file>` for each test file a test commit adds
+(`test/**/*_test.dart`); "No tests were found." in the output is an error of
+the run.
+
+The Flutter version is pinned in three places: `pubspec.yaml`
+(`environment: sdk:` and `flutter:`, both exact), `ci.yml`
+(`FLUTTER_VERSION`), and `flow.yml` (`setup-command`, `--branch`).
+Change all four values together, in one pull request.
 
 ## Coding conventions
 
@@ -164,8 +252,8 @@ From the EPIC-11 spec, section 2.11. Every Mobile card follows them.
 | State | `flutter_bloc`: a Cubit for a simple screen, a Bloc for a flow with many events; tested with `bloc_test` from a state and an event |
 | Routing | `go_router` (`lib/app/router.dart`); it also opens the `/join/*` Universal Links and App Links |
 | Lint | `flutter_lints` plus the rules in `analysis_options.yaml`; an info is an error in CI |
-| API client | Generated from the pinned `tripmate-contracts` version with OpenAPI Generator, `dart-dio` (MF2). Never edit generated code by hand. |
-| Translations | ARB files generated from `tripmate-contracts` (MF2). No user-facing text hard-coded in a widget once they exist. |
+| API client | Generated from the pinned `tripmate-contracts` version with OpenAPI Generator, `dart-dio` (`packages/tripmate_api/`). Never edit generated code by hand. |
+| Translations | ARB files generated from `tripmate-contracts` into `lib/l10n/`. No user-facing text hard-coded in a widget: use `AppLocalizations`. |
 
 ### Folder layout
 
@@ -180,7 +268,8 @@ lib/
 │   ├── flavor.dart        AppFlavor: dev, prod
 │   ├── api_mode.dart      ApiMode: real, mock (API_MODE)
 │   └── router.dart        go_router routes
-├── core/                  Shared by features: API client, translations, storage (from MF2)
+├── core/api/              Device id, idempotency key, mock interceptor, createDio
+├── l10n/                  Generated ARB files and AppLocalizations
 └── features/
     └── <feature>/
         ├── data/          Repositories and data sources, over the generated client

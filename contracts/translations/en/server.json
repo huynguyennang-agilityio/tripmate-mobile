@@ -1,0 +1,5 @@
+{
+  "server.error": "Something went wrong on our side. Try again later.",
+  "server.unavailable": "TripMate is not available right now. Try again in a moment.",
+  "server.not_implemented": "This is not available yet. It is coming in a later version."
+}
