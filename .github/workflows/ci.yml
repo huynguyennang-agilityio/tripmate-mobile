@@ -1,6 +1,6 @@
 # CI of tripmate-mobile (EPIC-11 spec, sections 2.9 and 2.11).
-# The job names Analyze, Test, and Android build are the required checks
-# on main; renaming a job means changing the branch protection too.
+# The job names Analyze, Test, Contracts, and Android build are the required
+# checks on main; renaming a job means changing the branch protection too.
 name: CI
 
 on:
@@ -38,9 +38,14 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      # The MF2 tests of tool/contracts.dart generate the client, which needs Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -48,6 +53,26 @@ jobs:
           cache: true
       - run: flutter pub get --enforce-lockfile
       - run: flutter test
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      # Regenerates the contracts copy, the client, the ARB files, and the
+      # localizations from CONTRACTS_VERSION and fails on any difference.
+      - run: dart run tool/contracts.dart check
 
   android-build:
     name: Android build
