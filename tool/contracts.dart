@@ -30,6 +30,7 @@
 // Nothing here depends on the time or the machine: the same inputs give the
 // same files.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -91,6 +92,11 @@ Future<void> main(List<String> args) async {
     stderr.writeln('contracts: unexpected failure: $error');
     exitCode = 2;
   }
+  // Exit explicitly: an open socket or a stray timer must never keep the
+  // process (and the CI job) alive after the tool is done.
+  await stdout.flush();
+  await stderr.flush();
+  exit(exitCode);
 }
 
 class _ToolError implements Exception {
@@ -485,21 +491,8 @@ Future<File> _generatorJar() async {
   final partial = File(
     '${jar.path}.$pid.${DateTime.now().microsecondsSinceEpoch}.part',
   );
-  final client = HttpClient();
   try {
-    final request = await client.getUrl(Uri.parse(_generatorUrl));
-    final response = await request.close();
-    if (response.statusCode != 200) {
-      throw _ToolError(
-        'Downloading $_generatorUrl failed: HTTP ${response.statusCode}.',
-      );
-    }
-    final sink = partial.openWrite();
-    await response.pipe(sink);
-  } finally {
-    client.close();
-  }
-  try {
+    await _download(partial);
     final actual = _sha256(partial);
     if (actual != _generatorSha256) {
       throw _ToolError(
@@ -521,6 +514,64 @@ Future<File> _generatorJar() async {
     }
   }
   return jar;
+}
+
+const _downloadAttempts = 4;
+
+/// Downloads [_generatorUrl] into [target]. Retries on HTTP 429, HTTP 5xx,
+/// and socket or timeout errors, waiting 2, 4, and 8 seconds (or the
+/// `Retry-After` of the answer when it is at most 30 seconds); any other
+/// answer fails at once. The body of an answer that is not used is drained
+/// and the client is closed with `force`, so no socket keeps the process
+/// alive.
+Future<void> _download(File target) async {
+  String? lastFailure;
+  for (var attempt = 1; attempt <= _downloadAttempts; attempt++) {
+    var wait = Duration(seconds: 1 << attempt);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30);
+    try {
+      final request = await client.getUrl(Uri.parse(_generatorUrl));
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        final sink = target.openWrite();
+        try {
+          await response.timeout(const Duration(minutes: 5)).pipe(sink);
+        } finally {
+          await sink.close().catchError((Object _) {});
+        }
+        return;
+      }
+      await response.drain<void>();
+      final status = response.statusCode;
+      if (status != 429 && status < 500) {
+        throw _ToolError('Downloading $_generatorUrl failed: HTTP $status.');
+      }
+      lastFailure = 'HTTP $status';
+      final seconds = int.tryParse(response.headers.value('retry-after') ?? '');
+      if (seconds != null && seconds >= 0 && seconds <= 30) {
+        wait = Duration(seconds: seconds);
+      }
+    } on IOException catch (error) {
+      lastFailure = '$error';
+    } on TimeoutException catch (error) {
+      lastFailure = '$error';
+    } finally {
+      client.close(force: true);
+    }
+    if (attempt < _downloadAttempts) {
+      stderr.writeln(
+        'contracts: download attempt $attempt failed ($lastFailure); '
+        'retrying in ${wait.inSeconds} s.',
+      );
+      await Future<void>.delayed(wait);
+    }
+  }
+  throw _ToolError(
+    'Downloading $_generatorUrl failed after $_downloadAttempts attempts '
+    '(last: $lastFailure). Try again later, or put the jar with SHA-256 '
+    '$_generatorSha256 into the cache folder (TRIPMATE_CACHE_DIR).',
+  );
 }
 
 String _sha256(File file) => sha256.convert(file.readAsBytesSync()).toString();
