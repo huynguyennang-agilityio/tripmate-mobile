@@ -1,10 +1,11 @@
 // Generates and checks everything that comes from the pinned `tripmate-contracts`
 // version (EPIC-11 spec, sections 2.9 and 2.11; task MF2).
 //
-//   dart run tool/contracts.dart generate [--root <dir>] [--source <dir>]
+//   dart run tool/contracts.dart generate [--root <dir>] [--source <dir>] [--update-lock]
 //   dart run tool/contracts.dart check    [--root <dir>] [--source <dir>]
 //
-// The pinned version is the tag in `CONTRACTS_VERSION`. The tool builds, in a
+// The pinned version is the tag in `CONTRACTS_VERSION`; `CONTRACTS_SHA` holds
+// the commit the tag must resolve to (checked after fetching it). The tool builds, in a
 // temporary folder, every file that comes from it:
 //
 //   contracts/              byte-for-byte copy of openapi.json and translations/
@@ -19,6 +20,10 @@
 // --root    the repository (default: the current directory).
 // --source  a local folder laid out like `tripmate-contracts` (openapi.json,
 //           translations/<lang>/*.json), used instead of fetching the tag.
+// --update-lock  (generate only) resolve the generated client's build tools
+//           afresh and write `tool/generator.pubspec.lock`. Otherwise that
+//           committed lock is used with `--enforce-lockfile`, so the build
+//           tools never float.
 //
 // Needs Java 17 or later (JAVA_HOME or `java` on PATH) for OpenAPI Generator,
 // `git` to fetch the tag, and network access to pub.dev for build_runner.
@@ -50,6 +55,10 @@ const _pinnedBuildTools = {
   'json_serializable': '6.11.2',
 };
 
+/// The committed lock of the generated client's workspace, relative to the
+/// root. It pins the transitive build tools that [_pinnedBuildTools] do not.
+const _generatorLockPath = 'tool/generator.pubspec.lock';
+
 const _clientPath = 'packages/tripmate_api';
 const _l10nDir = 'lib/l10n';
 
@@ -65,6 +74,21 @@ Future<void> main(List<String> args) async {
     exitCode = await _run(args);
   } on _ToolError catch (error) {
     stderr.writeln('contracts: ${error.message}');
+    exitCode = 2;
+  } on FileSystemException catch (error) {
+    stderr.writeln(
+      'contracts: file error: ${error.message} ${error.path ?? ''} '
+      '(${error.osError?.message ?? 'no details'}).',
+    );
+    exitCode = 2;
+  } on IOException catch (error) {
+    stderr.writeln('contracts: network or I/O error: $error');
+    exitCode = 2;
+  } on FormatException catch (error) {
+    stderr.writeln('contracts: malformed input: ${error.message}');
+    exitCode = 2;
+  } on Object catch (error) {
+    stderr.writeln('contracts: unexpected failure: $error');
     exitCode = 2;
   }
 }
@@ -88,9 +112,12 @@ Future<int> _run(List<String> args) async {
   }
   String? root;
   String? source;
+  var updateLock = false;
   for (var i = 1; i < args.length; i++) {
     final arg = args[i];
-    if ((arg == '--root' || arg == '--source') && i + 1 < args.length) {
+    if (arg == '--update-lock' && command == 'generate') {
+      updateLock = true;
+    } else if ((arg == '--root' || arg == '--source') && i + 1 < args.length) {
       if (arg == '--root') {
         root = args[++i];
       } else {
@@ -107,17 +134,32 @@ Future<int> _run(List<String> args) async {
     throw _ToolError('${versionFile.path} does not exist.');
   }
   final version = versionFile.readAsStringSync().trim();
+  final lockFile = File('${rootDir.path}/$_generatorLockPath');
+  if (!updateLock && !lockFile.existsSync()) {
+    throw _ToolError(
+      '${lockFile.path} does not exist. Run '
+      '"dart run tool/contracts.dart generate --update-lock" and commit it.',
+    );
+  }
 
   final temp = Directory.systemTemp.createTempSync('tripmate_contracts_');
   try {
     final sourceDir = source != null
         ? Directory(source).absolute
-        : await _fetchTag(version, Directory('${temp.path}/source'));
+        : await _fetchTag(
+            version,
+            _readSha(rootDir),
+            Directory('${temp.path}/source'),
+          );
     final out = Directory('${temp.path}/out')..createSync();
-    await _generateAll(sourceDir, out, Directory('${temp.path}/work'));
+    final work = Directory('${temp.path}/work');
+    await _generateAll(sourceDir, out, work, lockFile, updateLock);
 
     if (command == 'generate') {
       _install(out, rootDir);
+      if (updateLock) {
+        File('${work.path}/client.pubspec.lock').copySync(lockFile.path);
+      }
       stdout.writeln('Generated from $version into ${rootDir.path}.');
       return 0;
     }
@@ -143,7 +185,20 @@ Future<int> _run(List<String> args) async {
 // Fetching the pinned tag
 // ---------------------------------------------------------------------------
 
-Future<Directory> _fetchTag(String tag, Directory into) async {
+/// The commit `CONTRACTS_SHA` pins: 40 hex digits on one line.
+String _readSha(Directory root) {
+  final file = File('${root.path}/CONTRACTS_SHA');
+  if (!file.existsSync()) {
+    throw _ToolError('${file.path} does not exist (the commit of the tag).');
+  }
+  final sha = file.readAsStringSync().trim();
+  if (!RegExp(r'^[0-9a-f]{40}$').hasMatch(sha)) {
+    throw _ToolError('${file.path} must hold a full 40-digit commit SHA.');
+  }
+  return sha;
+}
+
+Future<Directory> _fetchTag(String tag, String sha, Directory into) async {
   await _exec('git', [
     'clone',
     '--quiet',
@@ -154,6 +209,15 @@ Future<Directory> _fetchTag(String tag, Directory into) async {
     _contractsRepository,
     into.path,
   ], what: 'fetching $tag of tripmate-contracts');
+  final head = await Process.run('git', ['-C', into.path, 'rev-parse', 'HEAD']);
+  final actual = '${head.stdout}'.trim();
+  if (head.exitCode != 0 || actual != sha) {
+    throw _ToolError(
+      'The tag $tag resolves to ${actual.isEmpty ? 'an unknown commit' : actual}, '
+      'but CONTRACTS_SHA pins $sha. The tag was moved or CONTRACTS_SHA is '
+      'wrong; nothing was generated.',
+    );
+  }
   return into;
 }
 
@@ -165,12 +229,14 @@ Future<void> _generateAll(
   Directory source,
   Directory out,
   Directory work,
+  File lockFile,
+  bool updateLock,
 ) async {
   work.createSync(recursive: true);
   _copyContracts(source, out);
   _writeArb(out);
   await _generateLocalizations(out, work);
-  await _generateClient(out, work);
+  await _generateClient(out, work, lockFile, updateLock);
 }
 
 /// A byte-for-byte copy of `openapi.json` and `translations/`.
@@ -222,7 +288,12 @@ void _writeArb(Directory out) {
     final arb = <String, String>{};
     final sourceOf = <String, String>{};
     for (final file in files) {
-      final messages = jsonDecode(file.readAsStringSync());
+      final Object? messages;
+      try {
+        messages = jsonDecode(file.readAsStringSync());
+      } on FormatException catch (error) {
+        throw _ToolError('${file.path} is not valid JSON: ${error.message}');
+      }
       if (messages is! Map<String, dynamic>) {
         throw _ToolError('${file.path} is not a JSON object.');
       }
@@ -235,7 +306,14 @@ void _writeArb(Directory out) {
           );
         }
         sourceOf[key] = entry.key;
-        arb[key] = entry.value as String;
+        final value = entry.value;
+        if (value is! String) {
+          throw _ToolError(
+            'The translation "${entry.key}" in ${file.path} is not a string '
+            '(${value.runtimeType}).',
+          );
+        }
+        arb[key] = value;
       }
     }
     File(
@@ -290,7 +368,12 @@ format: true
   }
 }
 
-Future<void> _generateClient(Directory out, Directory work) async {
+Future<void> _generateClient(
+  Directory out,
+  Directory work,
+  File lockFile,
+  bool updateLock,
+) async {
   final jar = await _generatorJar();
   final generated = Directory('${work.path}/client');
   await _exec(
@@ -319,9 +402,12 @@ Future<void> _generateClient(Directory out, Directory work) async {
 
   _pinBuildTools(File('${generated.path}/pubspec.yaml'));
   final dart = Platform.resolvedExecutable;
+  if (!updateLock) {
+    lockFile.copySync('${generated.path}/pubspec.lock');
+  }
   await _exec(
     dart,
-    ['pub', 'get'],
+    ['pub', 'get', if (!updateLock) '--enforce-lockfile'],
     workingDirectory: generated.path,
     what: 'dart pub get (client)',
   );
@@ -340,6 +426,12 @@ Future<void> _generateClient(Directory out, Directory work) async {
     what: 'dart format (client)',
   );
 
+  if (updateLock) {
+    // Kept for `generate --update-lock`, which copies it to the repository.
+    File(
+      '${generated.path}/pubspec.lock',
+    ).copySync('${work.path}/client.pubspec.lock');
+  }
   for (final name in _ignoredNames) {
     final entity = FileSystemEntity.typeSync('${generated.path}/$name');
     if (entity == FileSystemEntityType.directory) {
@@ -388,7 +480,11 @@ Future<File> _generatorJar() async {
     return jar;
   }
   stdout.writeln('Downloading OpenAPI Generator $_generatorVersion ...');
-  final partial = File('${jar.path}.part');
+  // A file of its own per run, so parallel runs (the test files run in
+  // parallel) never write the same file; the rename below is atomic.
+  final partial = File(
+    '${jar.path}.$pid.${DateTime.now().microsecondsSinceEpoch}.part',
+  );
   final client = HttpClient();
   try {
     final request = await client.getUrl(Uri.parse(_generatorUrl));
@@ -403,15 +499,27 @@ Future<File> _generatorJar() async {
   } finally {
     client.close();
   }
-  final actual = _sha256(partial);
-  if (actual != _generatorSha256) {
-    partial.deleteSync();
-    throw _ToolError(
-      'The OpenAPI Generator jar has SHA-256 $actual, expected '
-      '$_generatorSha256. It was not used.',
-    );
+  try {
+    final actual = _sha256(partial);
+    if (actual != _generatorSha256) {
+      throw _ToolError(
+        'The OpenAPI Generator jar has SHA-256 $actual, expected '
+        '$_generatorSha256. It was not used.',
+      );
+    }
+    try {
+      partial.renameSync(jar.path);
+    } on FileSystemException {
+      // Another run may have put the same, checked jar there first.
+      if (!(jar.existsSync() && _sha256(jar) == _generatorSha256)) {
+        rethrow;
+      }
+    }
+  } finally {
+    if (partial.existsSync()) {
+      partial.deleteSync();
+    }
   }
-  partial.renameSync(jar.path);
   return jar;
 }
 
