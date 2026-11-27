@@ -33,14 +33,14 @@ jobs:
       # reporter, the one of GitHub Actions included.
       test-command: flutter test
       # failing-first runs this in the worktree of each test commit. It installs Flutter 3.38.5
-      # (pinned with pubspec.yaml and ci.yml) outside the worktree, puts it on PATH for the
+      # (pinned with pubspec.yaml and ci.yml; change all three together) outside the worktree, puts it on PATH for the
       # commands that follow, and resolves the dependencies. The MF2 contract-check tests need Java
       # and the OpenAPI Generator; the runner's own Temurin JDK serves them.
       setup-command: |
         git clone --quiet --depth 1 --branch 3.38.5 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
         echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
         export PATH="$RUNNER_TEMP/flutter/bin:$PATH"
-        flutter pub get
+        flutter pub get --enforce-lockfile
       # Dart runs on Flutter's own SDK, so no Node.
       node-version: ""
       test-file-pattern: test/**/*_test.dart

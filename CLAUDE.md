@@ -155,12 +155,21 @@ Every request carries `X-Device-Id` (`lib/core/api/device_id.dart`, kept in
 `shared_preferences`), and every `POST` an `Idempotency-Key`
 (`lib/core/api/idempotency.dart`); a retry sends the same
 `RequestOptions` again (`dio.fetch(error.requestOptions)`), so it keeps
-the key.
+the key. A retry that calls the generated method again (a "Try again"
+tap, a Cubit retrying after a timeout) builds new options, so it would get
+a new key. The interceptor keeps a key that is already set, so a create
+that can be retried this way makes one UUID per user action and passes it
+as `Options(headers: {IdempotencyKeyInterceptor.header: key})`. The first
+card with a create screen adds a helper for it.
 
 The base URL: `dev` is `http://10.0.2.2:8000` on Android and
 `http://localhost:8000` elsewhere; `prod` has no default yet (the
 production address is not decided) and needs
-`--dart-define=API_BASE_URL=<address>`, which also overrides `dev`.
+`--dart-define=API_BASE_URL=<address>`, which also overrides `dev`. In
+the `prod` flavor the address must start with `https://`. `main()` calls
+`checkApiConfig`, so a real-mode `prod` build without it (or with a
+non-https one) stops at startup with a clear message instead of at the
+first request.
 
 The test screen `/health` (`lib/features/health/`) shows the `status` and
 `version` of `GET /v1/health` in both modes.
@@ -177,7 +186,15 @@ and never edited by hand:
 | `packages/tripmate_api/` | The `dart-dio` client (OpenAPI Generator 7.17.0, jar checked by SHA-256, cached outside the repository; `json_serializable`, with its `build_runner` output committed) |
 | `lib/l10n/app_<lang>.arb`, `lib/l10n/app_localizations*.dart`, `l10n.yaml` | `translations/<lang>/*.json`; key `auth.not_signed_in` becomes `authNotSignedIn`; `flutter gen-l10n` |
 
-To move to a new tag: change `CONTRACTS_VERSION`, run `generate`, extract
+`CONTRACTS_SHA` holds the commit the tag must resolve to; the tool
+fetches the tag and fails when it points elsewhere. The build tools of the
+generated client are pinned by exact versions in the tool and by the
+committed `tool/generator.pubspec.lock` (used with `--enforce-lockfile`);
+`generate --update-lock` rewrites that lock when the generator or the tool's
+pinned versions change.
+
+To move to a new tag: change `CONTRACTS_VERSION` and `CONTRACTS_SHA`
+(`git rev-parse <tag>^{commit}` in `tripmate-contracts`), run `generate`, extract
 the tag's files into `test/fixtures/<tag>/` (the tests read them), commit
 all of it. `check` regenerates into a temporary folder and prints each
 file that differs, is missing, or is extra. Use `--source <dir>` for a
@@ -188,8 +205,14 @@ placeholders need ARB metadata the tool does not write yet.
 ### CI
 
 `.github/workflows/ci.yml` runs on every pull request to `main` and on
-every push to `main`, with Flutter 3.38.5. Its four jobs are required
-checks on `main`. Each job first runs
+every push to `main`, with Flutter 3.38.5. Its four jobs are the checks
+that `main` requires, but the branch protection of `main` lists only
+`Analyze`, `Test`, and `Android build` until the product owner adds the
+rest right after the MF2 pull request is merged: `Contracts`,
+`flow / failing-first`, `flow / test-lock`, and `gate / risk-gate`
+(`gate / risk-gate` only once `risk-gate.yml` is on `main`, because a
+`pull_request_target` workflow runs from the base; never the skipped
+`flow / risk-gate`). Until then MF2 is not done. Each job first runs
 `flutter pub get --enforce-lockfile`, which fails when `pubspec.lock`
 is missing or does not satisfy `pubspec.yaml`, so CI tests exactly the
 committed dependency set; commit `pubspec.lock` with every
@@ -208,16 +231,16 @@ is skipped here) and `.github/workflows/risk-gate.yml` (`gate / risk-gate`,
 on `pull_request_target`, so a pull request cannot change it) call the
 reusable workflows of `tripmate-backend`, pinned to the same commit as
 `tripmate-contracts`. `flow / failing-first`, `flow / test-lock`, and
-`gate / risk-gate` are required on `main` too. The risk levels of paths
+`gate / risk-gate` are to be required on `main` too (see above). The risk levels of paths
 are in `.github/risk-paths.toml`; a path no rule names is High. Failing
 first runs `flutter test <file>` for each test file a test commit adds
 (`test/**/*_test.dart`); "No tests were found." in the output is an error of
 the run.
 
-The Flutter version is pinned in two places, `pubspec.yaml`
-(`environment: sdk:` and `flutter:`, both exact) and the workflow's
-`FLUTTER_VERSION`. Change all three values together, in one pull
-request.
+The Flutter version is pinned in three places: `pubspec.yaml`
+(`environment: sdk:` and `flutter:`, both exact), `ci.yml`
+(`FLUTTER_VERSION`), and `flow.yml` (`setup-command`, `--branch`).
+Change all four values together, in one pull request.
 
 ## Coding conventions
 

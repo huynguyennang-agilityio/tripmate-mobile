@@ -37,6 +37,11 @@ level = "High"
 reason = "The pinned contract every generated file comes from"
 
 [[rule]]
+glob = "CONTRACTS_SHA"
+level = "High"
+reason = "The commit the pinned contract tag must resolve to"
+
+[[rule]]
 glob = "tool/**"
 level = "High"
 reason = "The generator and its checks"
@@ -60,6 +65,21 @@ reason = "Line endings the checks compare"
 glob = "analysis_options.yaml"
 level = "High"
 reason = "Lint rules that CI enforces"
+
+[[rule]]
+glob = "lib/core/**"
+level = "High"
+reason = "API client, request headers, device identity, and the mock: every call goes through them"
+
+[[rule]]
+glob = "**/flutter_test_config.dart"
+level = "High"
+reason = "Runs before every test file; it can change what the tests do"
+
+[[rule]]
+glob = "**/dart_test.yaml"
+level = "High"
+reason = "Test runner configuration (timeouts, tags, skips)"
 
 [[rule]]
 glob = "contracts/**"
