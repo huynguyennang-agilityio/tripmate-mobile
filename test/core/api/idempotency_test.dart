@@ -3,24 +3,37 @@
 //
 // MF2-4 (level U): a create request that is retried: both attempts carry the
 // same `Idempotency-Key`. The first attempt fails with 500; the retry sends
-// the same request again with `dio.fetch(error.requestOptions)`.
+// the same request again with `dio.fetch(error.requestOptions)`. The requests
+// go through the app's client, `createDio`.
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripmate_mobile/core/api/idempotency.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tripmate_mobile/app/api_mode.dart';
+import 'package:tripmate_mobile/app/flavor.dart';
+import 'package:tripmate_mobile/core/api/api_client.dart';
+import 'package:tripmate_mobile/core/api/device_id.dart';
 
 import '../../support/fake_adapter.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.resetStatic();
+    SharedPreferences.setMockInitialValues({});
+  });
+
   test('MF2-4 a create request that is retried: both attempts carry the same '
       'Idempotency-Key', () async {
     // The first request fails with 500, every later one succeeds.
     final adapter = RecordingAdapter(
       statusFor: (index, _) => index == 0 ? 500 : 201,
     );
-    final dio = Dio(BaseOptions(baseUrl: 'http://localhost:8000'))
-      ..httpClientAdapter = adapter
-      ..interceptors.add(IdempotencyKeyInterceptor());
+    final prefs = await SharedPreferences.getInstance();
+    final dio = createDio(
+      flavor: AppFlavor.dev,
+      mode: ApiMode.real,
+      deviceIds: DeviceIdStore(prefs: prefs),
+    )..httpClientAdapter = adapter;
 
     DioException? failure;
     try {

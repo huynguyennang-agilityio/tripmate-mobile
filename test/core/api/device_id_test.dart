@@ -2,8 +2,9 @@
 // Test cases: tasks/EPIC-11.md, task MF2. Interface: test/INTERFACE.md.
 //
 // MF2-3 (level U): any request carries `X-Device-Id`, the same value after
-// the app restarts. A restart is `SharedPreferences.resetStatic()` and a new
-// `SharedPreferences` instance, `DeviceIdStore`, and Dio.
+// the app restarts. The requests go through the app's client, `createDio`. A
+// restart is `SharedPreferences.resetStatic()` and a new `SharedPreferences`
+// instance, `DeviceIdStore`, and `createDio`.
 //
 // The contract (contracts/openapi.json, parameter `DeviceId`) gives the
 // header as a UUID.
@@ -11,6 +12,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tripmate_mobile/app/api_mode.dart';
+import 'package:tripmate_mobile/app/flavor.dart';
+import 'package:tripmate_mobile/core/api/api_client.dart';
 import 'package:tripmate_mobile/core/api/device_id.dart';
 
 import '../../support/fake_adapter.dart';
@@ -20,13 +24,16 @@ final _uuid = RegExp(
   caseSensitive: false,
 );
 
-/// A Dio as the app builds one at start: over a fresh `SharedPreferences`.
+/// The app's client as the app builds it at start, over a fresh
+/// `SharedPreferences`; only the network is replaced by a recording adapter.
 Future<(Dio, RecordingAdapter)> startApp() async {
   final prefs = await SharedPreferences.getInstance();
   final adapter = RecordingAdapter();
-  final dio = Dio(BaseOptions(baseUrl: 'http://localhost:8000'))
-    ..httpClientAdapter = adapter
-    ..interceptors.add(DeviceIdInterceptor(DeviceIdStore(prefs: prefs)));
+  final dio = createDio(
+    flavor: AppFlavor.dev,
+    mode: ApiMode.real,
+    deviceIds: DeviceIdStore(prefs: prefs),
+  )..httpClientAdapter = adapter;
   return (dio, adapter);
 }
 
