@@ -1,0 +1,17 @@
+{
+  "authNotSignedIn": "Sign in to continue.",
+  "authTokenExpired": "Your session has expired. Sign in again.",
+  "commonAppName": "TripMate",
+  "rateLimited": "Too many requests. Wait a moment and try again.",
+  "requestInvalid": "Some of the details you sent are not valid.",
+  "requestIdempotencyKeyRequired": "This request needs an Idempotency-Key header.",
+  "requestIdempotencyInProgress": "The same request is still being handled. Try again in a moment.",
+  "requestIdempotencyMismatch": "This Idempotency-Key was already used for a different request.",
+  "requestFieldMissing": "This field is required.",
+  "requestFieldInvalid": "This value is not valid.",
+  "requestNotFound": "This address does not exist.",
+  "requestMethodNotAllowed": "This action is not allowed here.",
+  "serverError": "Something went wrong on our side. Try again later.",
+  "serverUnavailable": "TripMate is not available right now. Try again in a moment.",
+  "serverNotImplemented": "This is not available yet. It is coming in a later version."
+}
