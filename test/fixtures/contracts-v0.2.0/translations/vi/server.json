@@ -1,0 +1,5 @@
+{
+  "server.error": "Đã có lỗi ở phía chúng tôi. Hãy thử lại sau.",
+  "server.unavailable": "TripMate tạm thời không hoạt động. Hãy thử lại sau giây lát.",
+  "server.not_implemented": "Tính năng này chưa có. Nó sẽ có trong một phiên bản sau."
+}

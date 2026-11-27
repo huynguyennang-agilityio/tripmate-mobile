@@ -1,0 +1,10 @@
+{
+  "request.invalid": "Some of the details you sent are not valid.",
+  "request.idempotency_key_required": "This request needs an Idempotency-Key header.",
+  "request.idempotency_in_progress": "The same request is still being handled. Try again in a moment.",
+  "request.idempotency_mismatch": "This Idempotency-Key was already used for a different request.",
+  "request.field_missing": "This field is required.",
+  "request.field_invalid": "This value is not valid.",
+  "request.not_found": "This address does not exist.",
+  "request.method_not_allowed": "This action is not allowed here."
+}
