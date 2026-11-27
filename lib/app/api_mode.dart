@@ -2,7 +2,7 @@
 ///
 /// Set at build time with `--dart-define=API_MODE=mock`; any other value,
 /// or none, means [real]. The mock interceptor that answers from the
-/// contract's examples is built in MF2.
+/// contract's examples is `MockApiInterceptor` (lib/core/api/mock_api.dart).
 enum ApiMode {
   /// Requests go to the backend of the flavor.
   real,
@@ -11,9 +11,9 @@ enum ApiMode {
   mock;
 
   /// The mode this build was made with.
-  static final ApiMode current = fromValue(
-    const String.fromEnvironment('API_MODE'),
-  );
+  static const ApiMode current = String.fromEnvironment('API_MODE') == 'mock'
+      ? ApiMode.mock
+      : ApiMode.real;
 
   /// The mode for a raw `API_MODE` [value].
   static ApiMode fromValue(String value) =>
