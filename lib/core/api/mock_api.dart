@@ -137,6 +137,11 @@ class MockApiInterceptor extends Interceptor {
       final content = response['content'] as Map<String, dynamic>?;
       final media = content?['application/json'] as Map<String, dynamic>?;
       if (media == null) {
+        // A 2xx response that declares no content at all (204, 202) is
+        // answered with no body; one with other media types is skipped.
+        if (content == null || content.isEmpty) {
+          return (status: int.parse(code), example: null);
+        }
         continue;
       }
       // Only the lowest 2xx response with JSON content answers.

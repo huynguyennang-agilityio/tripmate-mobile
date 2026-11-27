@@ -6,7 +6,8 @@ import 'package:uuid/uuid.dart';
 /// (EPIC-11 spec, section 2.11).
 ///
 /// The first read makes a UUID v4 and saves it; later reads, also after the
-/// app restarts, return the same value.
+/// app restarts, return the same value. Await [ensureSaved] once at startup
+/// (where the client is built) so the id is on disk before the first request.
 class DeviceIdStore {
   DeviceIdStore({required SharedPreferences prefs}) : _prefs = prefs;
 
@@ -14,15 +15,29 @@ class DeviceIdStore {
 
   final SharedPreferences _prefs;
 
+  Future<bool>? _pendingWrite;
+
+  /// Reads (or makes) the id and completes when it is saved. A failed save
+  /// is not fatal: the id stays in memory for this run and the next start
+  /// makes a new one.
+  Future<void> ensureSaved() async {
+    deviceId;
+    try {
+      await _pendingWrite;
+    } on Object {
+      // Nothing to do; see above.
+    }
+  }
+
   String get deviceId {
     final saved = _prefs.getString(_key);
     if (saved != null && saved.isNotEmpty) {
       return saved;
     }
     final created = const Uuid().v4();
-    // The write is not awaited: the value is kept in memory at once, and a
-    // failed save only means the next start makes a new id.
-    _prefs.setString(_key, created);
+    // SharedPreferences keeps the value in memory at once, so later reads
+    // return it; the write to disk is awaited in [ensureSaved].
+    _pendingWrite = _prefs.setString(_key, created);
     return created;
   }
 }

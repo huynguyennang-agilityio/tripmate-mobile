@@ -55,10 +55,12 @@ class _TripMateAppState extends State<TripMateApp> {
     final mock = widget.apiMode == ApiMode.mock
         ? await MockApiInterceptor.fromAsset()
         : null;
+    final deviceIds = DeviceIdStore(prefs: prefs);
+    await deviceIds.ensureSaved();
     return createDio(
       flavor: widget.flavor,
       mode: widget.apiMode,
-      deviceIds: DeviceIdStore(prefs: prefs),
+      deviceIds: deviceIds,
       mock: mock,
     );
   }

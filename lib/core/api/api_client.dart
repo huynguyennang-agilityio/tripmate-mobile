@@ -19,6 +19,12 @@ const String _apiBaseUrl = String.fromEnvironment('API_BASE_URL');
 /// emulator, `localhost:8000` elsewhere (the iOS simulator).
 String baseUrlFor(AppFlavor flavor) {
   if (_apiBaseUrl.isNotEmpty) {
+    if (flavor == AppFlavor.prod && !_apiBaseUrl.startsWith('https://')) {
+      throw StateError(
+        'API_BASE_URL must start with https:// in the prod flavor '
+        '(got "$_apiBaseUrl").',
+      );
+    }
     return _apiBaseUrl;
   }
   switch (flavor) {
@@ -31,6 +37,15 @@ String baseUrlFor(AppFlavor flavor) {
         'The production API address is not set: build with '
         '--dart-define=API_BASE_URL=<address>.',
       );
+  }
+}
+
+/// Fails at startup, with a clear message, when a real-mode build of
+/// [flavor] has no usable API address (a `prod` build without
+/// `API_BASE_URL`, or with a non-https one), instead of at the first request.
+void checkApiConfig({required AppFlavor flavor, required ApiMode mode}) {
+  if (mode == ApiMode.real) {
+    baseUrlFor(flavor);
   }
 }
 
