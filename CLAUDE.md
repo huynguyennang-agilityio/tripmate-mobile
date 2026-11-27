@@ -205,14 +205,12 @@ placeholders need ARB metadata the tool does not write yet.
 ### CI
 
 `.github/workflows/ci.yml` runs on every pull request to `main` and on
-every push to `main`, with Flutter 3.38.5. Its four jobs are the checks
-that `main` requires, but the branch protection of `main` lists only
-`Analyze`, `Test`, and `Android build` until the product owner adds the
-rest right after the MF2 pull request is merged: `Contracts`,
-`flow / failing-first`, `flow / test-lock`, and `gate / risk-gate`
-(`gate / risk-gate` only once `risk-gate.yml` is on `main`, because a
-`pull_request_target` workflow runs from the base; never the skipped
-`flow / risk-gate`). Until then MF2 is not done. Each job first runs
+every push to `main`, with Flutter 3.38.5. The branch protection of
+`main` requires seven checks: the four jobs below (`Analyze`, `Test`,
+`Contracts`, `Android build`) and the flow checks `flow / failing-first`,
+`flow / test-lock`, and `gate / risk-gate`. Never require the skipped
+`flow / mutation` or `flow / risk-gate`. Renaming a job means changing the
+branch protection too. Each job first runs
 `flutter pub get --enforce-lockfile`, which fails when `pubspec.lock`
 is missing or does not satisfy `pubspec.yaml`, so CI tests exactly the
 committed dependency set; commit `pubspec.lock` with every
@@ -231,7 +229,7 @@ is skipped here) and `.github/workflows/risk-gate.yml` (`gate / risk-gate`,
 on `pull_request_target`, so a pull request cannot change it) call the
 reusable workflows of `tripmate-backend`, pinned to the same commit as
 `tripmate-contracts`. `flow / failing-first`, `flow / test-lock`, and
-`gate / risk-gate` are to be required on `main` too (see above). The risk levels of paths
+`gate / risk-gate` are required on `main` (see above). The risk levels of paths
 are in `.github/risk-paths.toml`; a path no rule names is High. Failing
 first runs `flutter test <file>` for each test file a test commit adds
 (`test/**/*_test.dart`); "No tests were found." in the output is an error of

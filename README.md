@@ -224,7 +224,10 @@ every push to `main`. Each job starts with
 | `Android build` | Debug APKs of `dev` and `prod` |
 
 `main` is protected: every change goes through a pull request, the
-branch must be up to date with `main`, and all four jobs must pass, with the flow checks (`flow / failing-first`, `flow / test-lock`, `gate / risk-gate`). Until the product owner adds `Contracts` and the flow checks to the branch protection (right after the MF2 merge), only `Analyze`, `Test`, and `Android build` are enforced.
+branch must be up to date with `main`, and all four jobs must pass,
+with the flow checks `flow / failing-first`, `flow / test-lock`, and
+`gate / risk-gate`. A pull request that changes a High path needs the
+product owner's `human-approved` label, added after its newest push.
 
 ## How work is done
 
