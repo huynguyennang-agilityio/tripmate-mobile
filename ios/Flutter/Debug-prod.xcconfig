@@ -1,3 +1,4 @@
 // Build configuration Debug-prod: Flutter's Debug settings plus the prod flavor.
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug-prod.xcconfig"
 #include "Debug.xcconfig"
 #include "prod.xcconfig"
